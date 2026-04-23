@@ -15,7 +15,7 @@ services:
       retries: 10
 
   api:
-    image: noeuil/cyber-dashboard-api:v1
+    image: noeuil/cyber-dashboard-api:v1.1
     environment:
       DATABASE_URL: ${DATABASE_URL}
       API_NAME: ${API_NAME}
@@ -71,7 +71,7 @@ services:
         condition: service_healthy
 
   frontend:
-    image: noeuil/cyber-dashboard-frontend:v1
+    image: noeuil/cyber-dashboard-frontend:v1.1
     depends_on:
       - api
 
