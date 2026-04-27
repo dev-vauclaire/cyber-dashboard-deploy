@@ -3,7 +3,9 @@
 ## Aperçu
 
 Ce dépôt permet de déployer un dashboard de cyber, qui corrèle des addresses IP issues de différentes sources (OGO, Serenicity).
-Pour cela, l'application orchestre plusieurs projets GitHub packagés sous forme d'images Docker. Chaque module a une responsabilité 
+Pour cela, l'application orchestre plusieurs projets GitHub packagés sous forme d'images Docker. 
+
+**Chaque module a une responsabilité**
 | Module | GitHub | Docker Hub | Responsabilité |
 | --- | --- | --- | --- |
 | Frontend | [GitHub](https://github.com/dev-vauclaire/cyber-dashboard-frontend) | [Docker Hub](https://hub.docker.com/repository/docker/devauclaire/cyber-dashboard-frontend/general) | Interface web |
@@ -19,8 +21,8 @@ Pour cela, l'application orchestre plusieurs projets GitHub packagés sous forme
 
 Flow de la stack : 
 1. Le **scheduler** récupère périodiquement les adresses IP depuis les APIs OGO et Serenicity, et les stocke dans la base de données.
-2. Le **common IP correlator** récupère les nouvelles adresses IP stockées et les compare avec les adresses IP antérieures pour identifier les adresses IP communes. Les résultats sont stockés dans la base de données sous forme d'alertes.
-3. l'**API** expose les données de la BDD dont alertes de corrélation via une API REST.
+2. Le **common IP correlator** récupère les nouvelles adresses IP stockées, les compares avec les adresses IP déjà présentes dans sa mémoire RAM. Si il trouve une addresse commune à plusieurs sources, il stocke cette information sous forme d'alerte dans la base de données.
+3. l'**API** expose les données de la BDD.
 4. Le **reverse proxy** reçoit les requêtes HTTP, les redirige vers l'API ou le frontend selon le chemin d'accès, et gère la sécurité et les certificats SSL.
 5. Le **frontend** interroge l'API pour afficher les données et les alertes de corrélation à l'utilisateur.
 
@@ -29,8 +31,7 @@ Flow de la stack :
 ### Prérequis
 
 - Linux, Ubuntu recommandé (amd64)
-- Docker >= 29
-- Docker Compose, plugin officiel
+- Docker et Docker Compose installés
 - Pour OGO :
     - URL de base de l'API OGO
     - username OGO
