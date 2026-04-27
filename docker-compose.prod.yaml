@@ -15,7 +15,7 @@ services:
       retries: 10
 
   api:
-    image: noeuil/cyber-dashboard-api:v1.1
+    image: devauclaire/cyber-dashboard-api:1.0.0
     environment:
       DATABASE_URL: ${DATABASE_URL}
       API_NAME: ${API_NAME}
@@ -32,7 +32,7 @@ services:
         condition: service_healthy
 
   scheduler:
-    image: noeuil/cyber-dashboard-scheduler:v1
+    image: devauclaire/cyber-dashboard-scheduler:1.0.0
     environment:
       DB_HOST: ${SCHEDULER_DB_HOST}
       DB_PORT: ${SCHEDULER_DB_PORT}
@@ -55,7 +55,7 @@ services:
         condition: service_healthy
 
   common-ip-correlator:
-    image: noeuil/cyber-dashboard-common-ip:v1
+    image: devauclaire/cyber-dashboard-common-ip:1.0.0
     environment:
       CORRELATOR_DB_HOST: ${CORRELATOR_DB_HOST}
       CORRELATOR_DB_PORT: ${CORRELATOR_DB_PORT}
@@ -71,7 +71,7 @@ services:
         condition: service_healthy
 
   frontend:
-    image: noeuil/cyber-dashboard-frontend:v1.1
+    image: devauclaire/cyber-dashboard-frontend:1.0.0
     depends_on:
       - api
 
