@@ -98,7 +98,42 @@ Commande Docker Compose :
 docker compose -f docker-compose.prod.yaml up -d
 ```
 
-### 4. Vérifier les services
+### 4. HTTPS avec certificat entreprise / PKI interne
+
+Le reverse proxy Nginx termine le TLS : les clients se connectent en HTTPS sur Nginx, puis Nginx redirige les requêtes vers le frontend ou l'API sur le réseau Docker interne.
+
+Les certificats doivent être fournis par l'équipe IT, ou générés via une CSR puis signés par la PKI interne. Les fichiers attendus sont :
+
+```text
+certs/fullchain.pem
+certs/privkey.pem
+```
+
+Ces fichiers ne doivent jamais être commités. Le dossier `certs/` sert uniquement à monter les certificats réels dans le conteneur Nginx.
+
+Permissions recommandées :
+
+```bash
+chmod 600 certs/privkey.pem
+chmod 644 certs/fullchain.pem
+```
+
+#### Générer une CSR
+
+Si l'équipe IT demande une CSR, vous pouvez générer une clé privée et une demande de certificat :
+
+```bash
+openssl req -new -newkey rsa:4096 -nodes \
+  -keyout certs/privkey.pem \
+  -out certs/cyber-dashboard.csr \
+  -subj "/CN=cyber-dashboard.example.local"
+```
+
+Le fichier `certs/cyber-dashboard.csr` doit ensuite être transmis à l'équipe IT pour signature. Le certificat signé doit être placé dans `certs/fullchain.pem` et la clé privée dans `certs/privkey.pem`.
+
+> Nom DNS = Nom certificat = Nom utilisé dans navigateur
+
+### 5. Vérifier les services
 
 Vérifier l'état des conteneurs :
 
@@ -106,18 +141,21 @@ Vérifier l'état des conteneurs :
 docker compose -f docker-compose.prod.yaml ps
 ```
 
-### 5. Accéder à l'app
+### 6. Accéder à l'app
 
 Une fois la stack démarrée, l'application est disponible à l'adresse suivante :
 
 ```text
-http://localhost:80
+https://Nom_DNS/
 ```
 
-Depuis un serveur distant, remplacez `localhost` par l'adresse IP ou le nom de domaine du serveur :
+ou
+
+```text
+https://Adresse_IP/
+```
 
 ## À faire
 
-- [ ] Activer HTTPS
 - [ ] Sécuriser les variables sensibles
 - [ ] Ajouter un mode d'authentification
