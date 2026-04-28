@@ -72,8 +72,7 @@ La stack lit sa configuration depuis un fichier `.env` placé à la racine du do
 | `OGO_BASE_URL` | URL de base de l'API OGO | `https://example.ogo.local` |
 | `OGO_USERNAME` | Identifiant OGO | `user@example.com` |
 | `OGO_API_KEY` | Clé API OGO | `change-me` |
-| `OGO_SITE_NAME_OR_ID` | Nom ou identifiant du site OGO à synchroniser | `site-1` |
-| `OGO_JOURNAL_PAGE_SIZE` | Taille des pages récupérées depuis le journal OGO | `100` |
+| `OGO_SITE_NAME_OR_ID` | Nom ou identifiant du site OGO à synchroniser | `www.example.com` |
 | `SERENICITY_BASE_URL` | URL de base de l'API Serenicity | `https://example.serenicity.local` |
 | `SERENICITY_API_KEY` | Clé API Serenicity | `change-me` |
 | `CORRELATOR_BATCH_SIZE` | Nombre d'éléments traités par lot | `500` |
