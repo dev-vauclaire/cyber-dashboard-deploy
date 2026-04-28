@@ -59,19 +59,15 @@ La stack lit sa configuration depuis un fichier `.env` placé à la racine du do
 | `POSTGRES_USER` | Utilisateur PostgreSQL créé au démarrage | `cyber_dashboard` |
 | `POSTGRES_PASSWORD` | Mot de passe PostgreSQL | `change-me` |
 | `POSTGRES_DB` | Nom de la base de données PostgreSQL | `cyber_dashboard` |
-| `DATABASE_URL` | URL de connexion utilisée par l'API | `postgresql://cyber_dashboard:change-me@db:5432/cyber_dashboard` |
+| `DB_HOST` | Hôte PostgreSQL utilisé par les services applicatifs | `db` |
+| `DB_PORT` | Port PostgreSQL utilisé par les services applicatifs | `5432` |
 | `API_NAME` | Nom affiché ou utilisé par l'API | `Cyber Dashboard API` |
 | `API_HOST` | Adresse d'écoute de l'API dans le conteneur | `0.0.0.0` |
 | `API_PORT` | Port d'écoute de l'API dans le conteneur | `8000` |
 | `API_LOG_LEVEL` | Niveau de logs de l'API | `INFO` |
-| `SCHEDULER_DB_HOST` | Hôte PostgreSQL utilisé par le scheduler | `db` |
-| `SCHEDULER_DB_PORT` | Port PostgreSQL utilisé par le scheduler | `5432` |
-| `SCHEDULER_DB_NAME` | Base PostgreSQL utilisée par le scheduler | `cyber_dashboard` |
-| `SCHEDULER_DB_USER` | Utilisateur PostgreSQL utilisé par le scheduler | `cyber_dashboard` |
-| `SCHEDULER_DB_PASSWORD` | Mot de passe PostgreSQL utilisé par le scheduler | `change-me` |
 | `LIMIT_REQUEST_PER_DAY` | Limite de requêtes par jour vers les APIs externes | `24` |
 | `LOG_LEVEL` | Niveau de logs du scheduler | `INFO` |
-| `HTTP_TIMEOUT_SECONDS` | Timeout HTTP des appels externes | `30` |
+| `HTTP_TIMEOUT_SECONDS` | Timeout HTTP des appels externes | `10` |
 | `POLL_SAFETY_WINDOW_SECONDS` | Fenêtre de sécurité pour la récupération périodique | `300` |
 | `OGO_BASE_URL` | URL de base de l'API OGO | `https://example.ogo.local` |
 | `OGO_USERNAME` | Identifiant OGO | `user@example.com` |
@@ -80,15 +76,10 @@ La stack lit sa configuration depuis un fichier `.env` placé à la racine du do
 | `OGO_JOURNAL_PAGE_SIZE` | Taille des pages récupérées depuis le journal OGO | `100` |
 | `SERENICITY_BASE_URL` | URL de base de l'API Serenicity | `https://example.serenicity.local` |
 | `SERENICITY_API_KEY` | Clé API Serenicity | `change-me` |
-| `CORRELATOR_DB_HOST` | Hôte PostgreSQL utilisé par le corrélateur | `db` |
-| `CORRELATOR_DB_PORT` | Port PostgreSQL utilisé par le corrélateur | `5432` |
-| `CORRELATOR_DB_NAME` | Base PostgreSQL utilisée par le corrélateur | `cyber_dashboard` |
-| `CORRELATOR_DB_USER` | Utilisateur PostgreSQL utilisé par le corrélateur | `cyber_dashboard` |
-| `CORRELATOR_DB_PASSWORD` | Mot de passe PostgreSQL utilisé par le corrélateur | `change-me` |
 | `CORRELATOR_BATCH_SIZE` | Nombre d'éléments traités par lot | `500` |
-| `CORRELATOR_POLL_INTERVAL_SECONDS` | Intervalle entre deux traitements | `60` |
+| `CORRELATOR_POLL_INTERVAL_SECONDS` | Intervalle entre deux traitements | `10` |
 | `CORRELATOR_LOG_LEVEL` | Niveau de logs du corrélateur | `INFO` |
-| `CORRELATOR_COMPUTE_AVERAGE_PROCESSING_TIME` | Active le calcul du temps moyen de traitement | `true` |
+| `CORRELATOR_COMPUTE_AVERAGE_PROCESSING_TIME` | Active le calcul du temps moyen de traitement | `false` |
 
 #### Créer `.env` depuis `.env.example`
 
