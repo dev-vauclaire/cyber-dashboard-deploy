@@ -54,7 +54,7 @@ cd cyber-dashboard-deploy
 ### 2. Créer manuellement le fichier `.env`
 
 La stack lit sa configuration depuis un fichier `.env` placé à la racine du dossier de déploiement.
-les variables d'environnement avec le label [REQUIRED] doivent obligatoirement être définies par l'utilisateur, pour les valeurs avec le label [DEFAULT] l'utilisateur peut soit conserver la valeur par défaut, soit la modifier en fonction de ses besoins. ( il est recommandé de laisser les valeurs par défaut )
+les variables d'environnement avec le label [REQUIRED] doivent obligatoirement être définies par l'utilisateur, pour les valeurs avec le label [DEFAULT] l'utilisateur peut soit conserver la valeur par défaut, soit la modifier en fonction de ses besoins. ( il est recommandé de laisser les valeurs par défaut ), les variables avec le lable [KEEP] sont utilisées par les services applicatifs et ne doivent pas être modifiées.
 
 #### Créer `.env` depuis `.env.example`
 
@@ -76,11 +76,11 @@ chmod 600 .env
 | `POSTGRES_USER` | Utilisateur PostgreSQL créé au démarrage | `cyber_dashboard` | [REQUIRED]
 | `POSTGRES_PASSWORD` | Mot de passe PostgreSQL | `change-me` | [REQUIRED]
 | `POSTGRES_DB` | Nom de la base de données PostgreSQL | `cyber_dashboard` | [REQUIRED]
-| `DB_HOST` | Hôte PostgreSQL utilisé par les services applicatifs | `db` | [REQUIRED]
+| `DB_HOST` | Hôte PostgreSQL utilisé par les services applicatifs | `db` | [KEEP]
 | `DB_PORT` | Port PostgreSQL utilisé par les services applicatifs | `5432` | [DEFAULT]
 | `API_NAME` | Nom affiché ou utilisé par l'API | `Cyber Dashboard API` | [DEFAULT]
 | `API_HOST` | Adresse d'écoute de l'API dans le conteneur | `0.0.0.0` | [DEFAULT]
-| `API_PORT` | Port d'écoute de l'API dans le conteneur | `8000` | [DEFAULT]
+| `API_PORT` | Port d'écoute de l'API dans le conteneur | `8000` | [KEEP]
 | `API_LOG_LEVEL` | Niveau de logs de l'API | `INFO` | [DEFAULT]
 | `LIMIT_REQUEST_PER_DAY` | Limite de requêtes par jour vers les APIs externes | `24` | [DEFAULT]
 | `LOG_LEVEL` | Niveau de logs du scheduler | `INFO` | [DEFAULT]
