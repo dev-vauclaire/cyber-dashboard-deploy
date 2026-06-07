@@ -31,9 +31,14 @@ services:
       DB_NAME: ${POSTGRES_DB}
       DB_USER: ${POSTGRES_USER}
       DB_PASSWORD: ${POSTGRES_PASSWORD}
+      OGO_BASE_URL: ${OGO_BASE_URL}
+      SERENICITY_BASE_URL: ${SERENICITY_BASE_URL}
+      CYBER_DASHBOARD_SECRET_KEY_FILE: /run/secrets/cyber_dashboard_secret_key
     depends_on:
       db:
         condition: service_healthy
+    secrets:
+      - cyber_dashboard_secret_key
 
   scheduler:
     build: ../cyber-dashboard-scheduler
@@ -92,3 +97,7 @@ services:
 
 volumes:
   db_data: {}
+
+secrets:
+  cyber_dashboard_secret_key:
+    file: ./secrets/cyber_dashboard_secret_key
