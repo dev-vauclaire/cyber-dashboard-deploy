@@ -26,6 +26,15 @@ Flow de la stack :
 4. Le **reverse proxy** reçoit les requêtes HTTP, les redirige vers l'API ou le frontend selon le chemin d'accès, et gère la sécurité et les certificats SSL.
 5. Le **frontend** interroge l'API pour afficher les données et les alertes de corrélation à l'utilisateur.
 
+## Scripts SQL
+
+Les scripts PostgreSQL sont separes en deux chemins :
+
+- `postgres/dev-init/` : initialisation de developpement depuis une base vide, utilisee par `docker-compose.dev.yaml`.
+- `postgres/prod-migrations/` : scripts historiques et futures migrations incrementales de production.
+
+Voir [postgres/README.md](./postgres/README.md) pour le detail et la procedure de reset de la base de developpement.
+
 ## Installation
 
 ### Prérequis
