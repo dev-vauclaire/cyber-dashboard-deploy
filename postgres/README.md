@@ -1,26 +1,45 @@
-# Organisation des scripts SQL
+# PostgreSQL dans `cyber-dashboard-deploy`
 
-Les scripts de base de donnees sont separes en deux chemins.
+Ce dépôt ne porte plus les migrations de schéma PostgreSQL.
 
-## dev-init
+La seule source de vérité du schéma Cyber Dashboard V2 est :
+- `cyber-dashboard-backend/alembic`
+- `cyber-dashboard-backend/packages/database/models`
 
-`postgres/dev-init/` est utilise par `docker-compose.dev.yaml`.
+## Principe
 
-Ce dossier sert a initialiser une base de developpement depuis zero. Les scripts doivent creer directement le schema final attendu par l'application, puis injecter les donnees de reference et le jeu de donnees de demonstration.
-
-Pour reinitialiser la base de developpement :
+Le service `migrate` de Docker Compose exécute :
 
 ```bash
-docker compose -f docker-compose.dev.yaml down -v
-docker compose -f docker-compose.dev.yaml up --build
+python scripts/migrate.py
 ```
 
-La commande `down -v` supprime le volume PostgreSQL de developpement. Au prochain `up`, PostgreSQL rejoue les scripts montes dans `/docker-entrypoint-initdb.d`.
+Ce script, embarqué depuis `cyber-dashboard-backend`, détecte l'état réel de la base puis applique Alembic.
 
-## prod-migrations
+Conséquences :
+- aucun dossier PostgreSQL local n'est monté dans `/docker-entrypoint-initdb.d`
+- `cyber-dashboard-deploy` ne doit plus contenir de scripts de création de tables ou d'index métier
+- les évolutions de schéma doivent être faites dans le monorepo backend, puis consommées ici via le service `migrate`
 
-`postgres/prod-migrations/` conserve les scripts historiques V1. Les migrations incrementales V2 seront ajoutees dans ce dossier au fur et a mesure.
+## Seeds de développement
 
-Ce dossier sert de reference pour faire evoluer une base de production depuis la V1 vers le schema final. Les fichiers doivent rester ordonnes numeriquement et ne doivent pas contenir de jeu de donnees de demonstration.
+Le seul usage restant du dossier `postgres/` dans ce dépôt est le seed optionnel de développement :
 
-Les migrations de production ne sont pas rejouees automatiquement sur une base PostgreSQL qui possede deja un volume initialise. Elles doivent etre appliquees selon la procedure de migration retenue pour l'environnement cible.
+```text
+postgres/
+└── seeds/
+    └── dev/
+```
+
+Les scripts SQL placés dans `postgres/seeds/dev/` sont exécutés uniquement si le profil Compose `demo-data` est activé.
+
+Exemple :
+
+```bash
+docker compose -f docker-compose.dev.yaml --profile demo-data up --build
+```
+
+Ces scripts doivent :
+- rester idempotents autant que possible
+- contenir uniquement des données locales de démonstration
+- ne jamais devenir une source de vérité du schéma

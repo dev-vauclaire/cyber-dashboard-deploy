@@ -1,123 +1,177 @@
-# Dashboard cyber déploiement
+# Cyber Dashboard Deploy
 
-## Aperçu
+Ce dépôt orchestre le déploiement Docker de Cyber Dashboard V2.
 
-Ce dépôt permet de déployer un dashboard de cyber, qui corrèle des adresses IP issues de différentes sources (OGO, Serenicity).
-Pour cela, l'application orchestre plusieurs projets GitHub packagés sous forme d'images Docker. 
+La stack déployée repose maintenant sur :
+- `cyber-dashboard-backend` pour l'API, le scheduler, le corrélateur d'IP communes et les migrations Alembic
+- `cyber-dashboard-frontend` pour l'interface web
+- PostgreSQL et Nginx pour la persistance et l'exposition HTTP/HTTPS
 
-**Chaque module a une responsabilité**
-| Module | GitHub | Docker Hub | Responsabilité |
-| --- | --- | --- | --- |
-| Frontend | [GitHub](https://github.com/dev-vauclaire/cyber-dashboard-frontend) | [Docker Hub](https://hub.docker.com/repository/docker/devauclaire/cyber-dashboard-frontend/general) | Interface web |
-| API | [GitHub](https://github.com/dev-vauclaire/cyber-dashboard-api.git) | [Docker Hub](https://hub.docker.com/r/devauclaire/cyber-dashboard-api) | API |
-| Scheduler | [GitHub](https://github.com/dev-vauclaire/cyber-dashboard-scheduler.git) | [Docker Hub](https://hub.docker.com/r/devauclaire/cyber-dashboard-scheduler) | Récupère périodiquement les IP |
-| Common IP Correlator | [GitHub](https://github.com/dev-vauclaire/cyber-dashboard-common-ip.git) | [Docker Hub](https://hub.docker.com/r/devauclaire/cyber-dashboard-common-ip) | Corrélation des adresses IP communes |
-| Base de données | Image officielle PostgreSQL | [Docker Hub](https://hub.docker.com/_/postgres) | Base de données |
-| Reverse proxy | Image officielle Nginx | [Docker Hub](https://hub.docker.com/_/nginx) | Reverse proxy |
+## Arborescence attendue
 
-## Architecture
+Le dépôt de déploiement reste séparé du monorepo backend. En local, l'arborescence attendue est la suivante :
 
-![Schéma de la stack Docker](./assets/dockerStackSchema.png "Schéma de la stack Docker")
-
-Flow de la stack : 
-1. Le **scheduler** récupère périodiquement les attaques (avec leur adresse IP associée) depuis les APIs OGO et Serenicity, et les stocke dans la base de données.
-2. Le **common IP correlator** récupère les nouvelles adresses IP stockées, les compares avec les adresses IP déjà présentes dans sa mémoire RAM. Si il trouve une adresse commune à plusieurs sources, il stocke/update cette information sous forme d'alerte dans la base de données.
-3. l'**API** expose les données de la base de données.
-4. Le **reverse proxy** reçoit les requêtes HTTP, les redirige vers l'API ou le frontend selon le chemin d'accès, et gère la sécurité et les certificats SSL.
-5. Le **frontend** interroge l'API pour afficher les données et les alertes de corrélation à l'utilisateur.
-
-## Scripts SQL
-
-Les scripts PostgreSQL sont separes en deux chemins :
-
-- `postgres/dev-init/` : initialisation de developpement depuis une base vide, utilisee par `docker-compose.dev.yaml`.
-- `postgres/prod-migrations/` : scripts historiques et futures migrations incrementales de production.
-
-Voir [postgres/README.md](./postgres/README.md) pour le detail et la procedure de reset de la base de developpement.
-
-## Installation
-
-### Prérequis
-
-- Linux, Ubuntu recommandé (amd64)
-- [Docker](https://docs.docker.com/get-docker/) et [Docker Compose v2](https://docs.docker.com/compose/install/) installés
-- Pour récupérer les données depuis OGO :
-    - URL de base de l'API OGO
-    - username OGO
-    - Clé API OGO
-    - Nom ou identifiant du site OGO à synchroniser
-- Pour récupérer les données depuis Serenicity :
-    - URL de base de l'API Serenicity
-    - Clé API Serenicity
-- Pour mettre en place le protocole HTTPS :
-    - Certificat SSL signé par la PKI interne ou l'équipe IT
-    - Clé privée associée au certificat
-
-### 1. Cloner le repository
-
-```bash
-git clone https://github.com/dev-vauclaire/cyber-dashboard-deploy.git
-cd cyber-dashboard-deploy
+```text
+cyber-dashboard/
+├── cyber-dashboard-backend/
+├── cyber-dashboard-deploy/
+└── cyber-dashboard-frontend/
 ```
 
-### 2. Créer manuellement le fichier `.env`
+## Architecture de la stack
 
-La stack lit sa configuration depuis un fichier `.env` placé à la racine du dossier de déploiement.
-les variables d'environnement avec le label [REQUIRED] doivent obligatoirement être définies par l'utilisateur, pour les valeurs avec le label [DEFAULT] l'utilisateur peut soit conserver la valeur par défaut, soit la modifier en fonction de ses besoins. ( il est recommandé de laisser les valeurs par défaut ), les variables avec le lable [KEEP] sont utilisées par les services applicatifs et ne doivent pas être modifiées.
+Les services principaux sont :
+- `db` : PostgreSQL
+- `migrate` : service one-shot qui exécute `python scripts/migrate.py`
+- `api` : backend FastAPI
+- `scheduler` : inventaire, collecte et rétention
+- `common-ip-correlator` : corrélation des IP communes
+- `frontend` : interface web
+- `reverse-proxy` : terminaison TLS et routage HTTP/HTTPS
 
-#### Créer `.env` depuis `.env.example`
+Le schéma de base de données n'est plus créé par des scripts SQL locaux montés dans PostgreSQL.
+La seule source de vérité du schéma est désormais :
+- `cyber-dashboard-backend/alembic`
+- `cyber-dashboard-backend/packages/database/models`
+
+## Variables d'environnement
+
+Crée le fichier `.env` à partir de l'exemple :
 
 ```bash
 cp .env.example .env
-nano .env
-```
-
-Permissions recommandées :
-
-```bash
 chmod 600 .env
 ```
 
-#### Variables d'environnement
+Variables attendues :
 
-| Variable | Description | Valeur par défaut | Obligatoire |
-| --- | --- | --- | --- |
-| `POSTGRES_USER` | Utilisateur PostgreSQL créé au démarrage | `cyber_dashboard` | [REQUIRED]
-| `POSTGRES_PASSWORD` | Mot de passe PostgreSQL | `change-me` | [REQUIRED]
-| `POSTGRES_DB` | Nom de la base de données PostgreSQL | `cyber_dashboard` | [REQUIRED]
-| `DB_HOST` | Hôte PostgreSQL utilisé par les services applicatifs | `db` | [KEEP]
-| `DB_PORT` | Port PostgreSQL utilisé par les services applicatifs | `5432` | [DEFAULT]
-| `API_NAME` | Nom affiché ou utilisé par l'API | `Cyber Dashboard API` | [DEFAULT]
-| `API_HOST` | Adresse d'écoute de l'API dans le conteneur | `0.0.0.0` | [DEFAULT]
-| `API_PORT` | Port d'écoute de l'API dans le conteneur | `8000` | [KEEP]
-| `API_LOG_LEVEL` | Niveau de logs de l'API | `INFO` | [DEFAULT]
-| `LIMIT_REQUEST_PER_DAY` | Limite de requêtes par jour vers les APIs externes | `24` | [DEFAULT]
-| `LOG_LEVEL` | Niveau de logs du scheduler | `INFO` | [DEFAULT]
-| `HTTP_TIMEOUT_SECONDS` | Timeout HTTP des appels externes | `20` | [DEFAULT]
-| `POLL_SAFETY_WINDOW_SECONDS` | Fenêtre de sécurité pour la récupération périodique | `300` | [DEFAULT]
-| `OGO_BASE_URL` | URL de base de l'API OGO | `https://example.ogo.local` | [REQUIRED]
-| `OGO_USERNAME` | Identifiant OGO | `user@example.com` | [REQUIRED]
-| `OGO_API_KEY` | Clé API OGO | `change-me` | [REQUIRED]
-| `OGO_SITE_NAME_OR_ID` | Nom ou identifiant du site OGO à synchroniser | `www.example.com` | [REQUIRED]
-| `SERENICITY_BASE_URL` | URL de base de l'API Serenicity | `https://example.serenicity.local` | [REQUIRED]
-| `SERENICITY_API_KEY` | Clé API Serenicity | `change-me` | [REQUIRED]
-| `CORRELATOR_BATCH_SIZE` | Nombre d'éléments traités par lot | `500` | [DEFAULT]
-| `CORRELATOR_POLL_INTERVAL_SECONDS` | Intervalle entre deux traitements | `10` | [DEFAULT]
-| `CORRELATOR_LOG_LEVEL` | Niveau de logs du corrélateur | `INFO` | [DEFAULT]
-| `CORRELATOR_COMPUTE_AVERAGE_PROCESSING_TIME` | Active le calcul du temps moyen de traitement | `false` | [DEFAULT]
+| Variable | Description |
+| --- | --- |
+| `POSTGRES_USER` | Utilisateur PostgreSQL |
+| `POSTGRES_PASSWORD` | Mot de passe PostgreSQL |
+| `POSTGRES_DB` | Nom de la base PostgreSQL |
+| `DB_HOST` | Hôte PostgreSQL vu depuis les conteneurs, généralement `db` |
+| `DB_PORT` | Port PostgreSQL, généralement `5432` |
+| `API_NAME` | Nom logique de l'API |
+| `API_HOST` | Adresse d'écoute logique de l'API |
+| `API_PORT` | Port logique de l'API |
+| `API_LOG_LEVEL` | Niveau de logs de l'API |
+| `LOG_LEVEL` | Niveau de logs du scheduler |
+| `CORRELATOR_BATCH_SIZE` | Taille de lot du corrélateur |
+| `CORRELATOR_POLL_INTERVAL_SECONDS` | Pause entre deux cycles du corrélateur |
+| `CORRELATOR_LOG_LEVEL` | Niveau de logs du corrélateur |
+| `CORRELATOR_COMPUTE_AVERAGE_PROCESSING_TIME` | Active le calcul du temps moyen |
+| `OGO_BASE_URL` | URL de base OGO V2 pour les validations et collectes |
+| `SERENICITY_BASE_URL` | URL de base Serenicity |
+| `CYBER_DASHBOARD_SECRET_KEY_FILE` | Chemin du secret monté dans les conteneurs |
+| `CYBER_DASHBOARD_SECRET_KEY` | Secret direct en variable d'environnement, utilisé seulement si le fichier n'est pas monté |
+| `CYBER_DASHBOARD_API_IMAGE` | Image prod de l'API |
+| `CYBER_DASHBOARD_SCHEDULER_IMAGE` | Image prod du scheduler |
+| `CYBER_DASHBOARD_COMMON_IP_IMAGE` | Image prod du corrélateur |
+| `CYBER_DASHBOARD_FRONTEND_IMAGE` | Image prod du frontend |
+| `CYBER_DASHBOARD_MIGRATE_IMAGE` | Image prod du conteneur de migration |
 
-### 3. Mettre en place HTTPS avec certificat entreprise / PKI interne
+Les anciennes variables de credentials collecteur ne sont plus utilisées par la stack V2 :
+- `OGO_USERNAME`
+- `OGO_API_KEY`
+- `OGO_SITE_NAME_OR_ID`
+- `SERENICITY_API_KEY`
 
-Le reverse proxy Nginx termine le TLS : les clients se connectent en HTTPS sur Nginx, puis Nginx redirige les requêtes vers le frontend ou l'API sur le réseau Docker interne.
+La configuration des collecteurs se fait désormais dans la base et via l'API.
 
-Les certificats doivent être fournis par l'équipe IT, ou générés via une CSR puis signés par la PKI interne. Les fichiers attendus sont :
+## Secrets
+
+La clé maître doit être disponible dans :
+
+```text
+secrets/cyber_dashboard_secret_key
+```
+
+Cette clé est montée dans les conteneurs API et scheduler sous :
+
+```text
+/run/secrets/cyber_dashboard_secret_key
+```
+
+Le dossier `secrets/` ne doit jamais être commité avec de vrais secrets.
+
+Exemple de génération locale :
+
+```bash
+openssl rand -hex 32 > secrets/cyber_dashboard_secret_key
+chmod 600 secrets/cyber_dashboard_secret_key
+```
+
+## Développement
+
+### Démarrage standard
+
+```bash
+docker compose -f docker-compose.dev.yaml up --build
+```
+
+Au démarrage :
+1. PostgreSQL lance un volume vide.
+2. Le service `migrate` applique Alembic avec `python scripts/migrate.py`.
+3. L'API, le scheduler et le corrélateur démarrent uniquement après succès de la migration.
+4. Le frontend et Nginx démarrent ensuite.
+
+### Avec seed de démonstration
+
+Le profil `demo-data` exécute les scripts SQL placés dans `postgres/seeds/dev/` après la migration :
+
+```bash
+docker compose -f docker-compose.dev.yaml --profile demo-data up --build
+```
+
+### Reset complet de la base locale
+
+```bash
+docker compose -f docker-compose.dev.yaml down -v
+docker compose -f docker-compose.dev.yaml up --build
+```
+
+### Vérifications utiles
+
+```bash
+docker compose -f docker-compose.dev.yaml config
+docker compose -f docker-compose.dev.yaml ps -a
+docker compose -f docker-compose.dev.yaml logs -f
+curl http://127.0.0.1:8000/health
+```
+
+## Production
+
+Le fichier `docker-compose.prod.yaml` consomme des images publiées dans un registry.
+Il ne build rien localement.
+
+L'image `CYBER_DASHBOARD_MIGRATE_IMAGE` doit embarquer le contenu nécessaire pour exécuter `/app/scripts/migrate.py`.
+Le contrat de référence peut être construit à partir de `cyber-dashboard-backend/Dockerfile.migrate`.
+
+### Démarrage
+
+```bash
+docker compose -f docker-compose.prod.yaml up -d
+```
+
+Le service `migrate` s'exécute en one-shot au démarrage puis les services backend démarrent une fois la migration terminée avec succès.
+
+### Vérifications
+
+```bash
+docker compose -f docker-compose.prod.yaml config
+docker compose -f docker-compose.prod.yaml ps -a
+docker compose -f docker-compose.prod.yaml logs -f
+```
+
+## HTTPS
+
+Les certificats attendus par Nginx sont :
 
 ```text
 certs/fullchain.pem
 certs/privkey.pem
 ```
-
-Ces fichiers ne doivent jamais être commités. Le dossier `certs/` sert uniquement à monter les certificats réels dans le conteneur Nginx.
 
 Permissions recommandées :
 
@@ -126,63 +180,8 @@ chmod 600 certs/privkey.pem
 chmod 644 certs/fullchain.pem
 ```
 
-#### Générer une CSR
+## Points d'attention
 
-Si l'équipe IT demande une CSR, vous pouvez générer une clé privée et une demande de certificat :
-
-```bash
-openssl req -new -newkey rsa:4096 -nodes \
-  -keyout certs/privkey.pem \
-  -out certs/cyber-dashboard.csr \
-  -subj "/CN=Nom_DNS"
-```
-
-Le fichier `certs/cyber-dashboard.csr` doit ensuite être transmis à l'équipe IT pour signature. Le certificat signé doit être placé dans `certs/fullchain.pem` et la clé privée dans `certs/privkey.pem`.
-
-> Nom DNS = Nom certificat = Nom utilisé dans navigateur
-
-### 4. Lancer la stack
-
-Commande Docker Compose :
-
-```bash
-docker compose -f docker-compose.prod.yaml up -d
-```
-
-Cette commande récupère les images Docker depuis Docker Hub, crée les conteneurs, et démarre la stack en arrière-plan.
-
-> ⚠️ Nécessite Docker Compose v2 (`docker compose`, pas `docker-compose`)
-
-### 5. Vérifier les services
-
-Vérifier l'état des conteneurs :
-
-```bash
-docker compose -f docker-compose.prod.yaml ps -a
-```
-
-Cette commande affiche la liste des conteneurs, leur statut, et les ports exposés. Assurez-vous que tous les conteneurs sont en état "Up".
-
-En cas d'erreur, consultez les logs :
-
-```bash
-docker compose -f docker-compose.prod.yaml logs -f
-```
-
-Cette commande affiche les logs en temps réel, ce qui peut aider à identifier les problèmes de démarrage ou de configuration.
-
-> ⚠️ Nécessite Docker Compose v2 (`docker compose`, pas `docker-compose`)
-
-### 6. Accéder à l'app
-
-Une fois la stack démarrée, l'application est disponible à l'adresse suivante :
-
-```text
-https://Nom_DNS/
-```
-
-## À faire
-
-- [ ] Ajouter des tests automatisés ( chaine CI/CD )
-- [ ] Ajouter un mode d'authentification
-- [ ] Ajouter un inventaire interactif des sources de données ( OGO, Serenicity, etc. )
+- Une base vide est initialisée uniquement par Alembic, jamais par des scripts SQL montés au runtime.
+- Le dépôt de déploiement ne porte plus la vérité du schéma PostgreSQL.
+- Les éventuels jeux de données de développement doivent rester limités au dossier `postgres/seeds/dev/`.

@@ -7,70 +7,82 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
     volumes:
       - db_data:/var/lib/postgresql/data
-      - ./postgres/prod-migrations:/docker-entrypoint-initdb.d
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 10
 
+  migrate:
+    image: ${CYBER_DASHBOARD_MIGRATE_IMAGE}
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${DB_HOST}:${DB_PORT}/${POSTGRES_DB}
+      CYBER_DASHBOARD_SECRET_KEY: ${CYBER_DASHBOARD_SECRET_KEY}
+    command: ["python", "/app/scripts/migrate.py"]
+    depends_on:
+      db:
+        condition: service_healthy
+
   api:
-    image: devauclaire/cyber-dashboard-api:1.0.0
+    image: ${CYBER_DASHBOARD_API_IMAGE}
     environment:
       API_NAME: ${API_NAME}
       API_HOST: ${API_HOST}
       API_PORT: ${API_PORT}
       API_LOG_LEVEL: ${API_LOG_LEVEL}
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${DB_HOST}:${DB_PORT}/${POSTGRES_DB}
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${DB_HOST}:${DB_PORT}/${POSTGRES_DB}
       DB_HOST: ${DB_HOST}
       DB_PORT: ${DB_PORT}
       DB_NAME: ${POSTGRES_DB}
       DB_USER: ${POSTGRES_USER}
       DB_PASSWORD: ${POSTGRES_PASSWORD}
+      CYBER_DASHBOARD_SECRET_KEY_FILE: /run/secrets/cyber_dashboard_secret_key
+      CYBER_DASHBOARD_SECRET_KEY: ${CYBER_DASHBOARD_SECRET_KEY}
+      OGO_BASE_URL: ${OGO_BASE_URL}
+      SERENICITY_BASE_URL: ${SERENICITY_BASE_URL}
     depends_on:
-      db:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    secrets:
+      - cyber_dashboard_secret_key
 
   scheduler:
-    image: devauclaire/cyber-dashboard-scheduler:1.0.0
+    image: ${CYBER_DASHBOARD_SCHEDULER_IMAGE}
     environment:
       DB_HOST: ${DB_HOST}
       DB_PORT: ${DB_PORT}
       DB_NAME: ${POSTGRES_DB}
       DB_USER: ${POSTGRES_USER}
       DB_PASSWORD: ${POSTGRES_PASSWORD}
-      LIMIT_REQUEST_PER_DAY: ${LIMIT_REQUEST_PER_DAY}
       LOG_LEVEL: ${LOG_LEVEL}
-      HTTP_TIMEOUT_SECONDS: ${HTTP_TIMEOUT_SECONDS}
-      POLL_SAFETY_WINDOW_SECONDS: ${POLL_SAFETY_WINDOW_SECONDS}
+      CYBER_DASHBOARD_SECRET_KEY_FILE: /run/secrets/cyber_dashboard_secret_key
+      CYBER_DASHBOARD_SECRET_KEY: ${CYBER_DASHBOARD_SECRET_KEY}
       OGO_BASE_URL: ${OGO_BASE_URL}
-      OGO_USERNAME: ${OGO_USERNAME}
-      OGO_API_KEY: ${OGO_API_KEY}
-      OGO_SITE_NAME_OR_ID: ${OGO_SITE_NAME_OR_ID}
       SERENICITY_BASE_URL: ${SERENICITY_BASE_URL}
-      SERENICITY_API_KEY: ${SERENICITY_API_KEY}
     depends_on:
-      db:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    secrets:
+      - cyber_dashboard_secret_key
 
   common-ip-correlator:
-    image: devauclaire/cyber-dashboard-common-ip:1.0.0
+    image: ${CYBER_DASHBOARD_COMMON_IP_IMAGE}
     environment:
-      CORRELATOR_DB_HOST: ${DB_HOST}
-      CORRELATOR_DB_PORT: ${DB_PORT}
-      CORRELATOR_DB_NAME: ${POSTGRES_DB}
-      CORRELATOR_DB_USER: ${POSTGRES_USER}
-      CORRELATOR_DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT}
+      DB_NAME: ${POSTGRES_DB}
+      DB_USER: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
       CORRELATOR_BATCH_SIZE: ${CORRELATOR_BATCH_SIZE}
       CORRELATOR_POLL_INTERVAL_SECONDS: ${CORRELATOR_POLL_INTERVAL_SECONDS}
       CORRELATOR_LOG_LEVEL: ${CORRELATOR_LOG_LEVEL}
       CORRELATOR_COMPUTE_AVERAGE_PROCESSING_TIME: ${CORRELATOR_COMPUTE_AVERAGE_PROCESSING_TIME}
     depends_on:
-      db:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
 
   frontend:
-    image: devauclaire/cyber-dashboard-frontend:1.0.0
+    image: ${CYBER_DASHBOARD_FRONTEND_IMAGE}
     depends_on:
       - api
 
@@ -88,3 +100,7 @@ services:
 
 volumes:
   db_data: {}
+
+secrets:
+  cyber_dashboard_secret_key:
+    file: ./secrets/cyber_dashboard_secret_key

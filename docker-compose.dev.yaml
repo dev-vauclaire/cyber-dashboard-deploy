@@ -9,15 +9,28 @@ services:
       - "5432:5432"
     volumes:
       - db_data:/var/lib/postgresql/data
-      - ./postgres/dev-init:/docker-entrypoint-initdb.d
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 10
 
+  migrate:
+    build:
+      context: ../cyber-dashboard-backend
+      dockerfile: Dockerfile.migrate
+    image: cyber-dashboard-migrate:dev
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${DB_HOST}:${DB_PORT}/${POSTGRES_DB}
+      CYBER_DASHBOARD_SECRET_KEY: ${CYBER_DASHBOARD_SECRET_KEY}
+    depends_on:
+      db:
+        condition: service_healthy
+
   api:
-    build: ../cyber-dashboard-api
+    build:
+      context: ../cyber-dashboard-backend
+      dockerfile: apps/cyber_dashboard_api/Dockerfile
     ports:
       - "8000:8000"
     environment:
@@ -25,23 +38,26 @@ services:
       API_HOST: ${API_HOST}
       API_PORT: ${API_PORT}
       API_LOG_LEVEL: ${API_LOG_LEVEL}
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${DB_HOST}:${DB_PORT}/${POSTGRES_DB}
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${DB_HOST}:${DB_PORT}/${POSTGRES_DB}
       DB_HOST: ${DB_HOST}
       DB_PORT: ${DB_PORT}
       DB_NAME: ${POSTGRES_DB}
       DB_USER: ${POSTGRES_USER}
       DB_PASSWORD: ${POSTGRES_PASSWORD}
+      CYBER_DASHBOARD_SECRET_KEY_FILE: /run/secrets/cyber_dashboard_secret_key
+      CYBER_DASHBOARD_SECRET_KEY: ${CYBER_DASHBOARD_SECRET_KEY}
       OGO_BASE_URL: ${OGO_BASE_URL}
       SERENICITY_BASE_URL: ${SERENICITY_BASE_URL}
-      CYBER_DASHBOARD_SECRET_KEY_FILE: /run/secrets/cyber_dashboard_secret_key
     depends_on:
-      db:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     secrets:
       - cyber_dashboard_secret_key
 
   scheduler:
-    build: ../cyber-dashboard-scheduler
+    build:
+      context: ../cyber-dashboard-backend
+      dockerfile: apps/scheduler/Dockerfile
     environment:
       DB_HOST: ${DB_HOST}
       DB_PORT: ${DB_PORT}
@@ -50,33 +66,54 @@ services:
       DB_PASSWORD: ${POSTGRES_PASSWORD}
       LIMIT_REQUEST_PER_DAY: ${LIMIT_REQUEST_PER_DAY}
       LOG_LEVEL: ${LOG_LEVEL}
-      HTTP_TIMEOUT_SECONDS: ${HTTP_TIMEOUT_SECONDS}
-      POLL_SAFETY_WINDOW_SECONDS: ${POLL_SAFETY_WINDOW_SECONDS}
+      CYBER_DASHBOARD_SECRET_KEY_FILE: /run/secrets/cyber_dashboard_secret_key
+      CYBER_DASHBOARD_SECRET_KEY: ${CYBER_DASHBOARD_SECRET_KEY}
       OGO_BASE_URL: ${OGO_BASE_URL}
-      OGO_USERNAME: ${OGO_USERNAME}
-      OGO_API_KEY: ${OGO_API_KEY}
-      OGO_SITE_NAME_OR_ID: ${OGO_SITE_NAME_OR_ID}
       SERENICITY_BASE_URL: ${SERENICITY_BASE_URL}
-      SERENICITY_API_KEY: ${SERENICITY_API_KEY}
     depends_on:
-      db:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    secrets:
+      - cyber_dashboard_secret_key
 
   common-ip-correlator:
-    build: ../cyber-dashboard-common-ip
+    build:
+      context: ../cyber-dashboard-backend
+      dockerfile: apps/common_ip/Dockerfile
     environment:
-      CORRELATOR_DB_HOST: ${DB_HOST}
-      CORRELATOR_DB_PORT: ${DB_PORT}
-      CORRELATOR_DB_NAME: ${POSTGRES_DB}
-      CORRELATOR_DB_USER: ${POSTGRES_USER}
-      CORRELATOR_DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT}
+      DB_NAME: ${POSTGRES_DB}
+      DB_USER: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
       CORRELATOR_BATCH_SIZE: ${CORRELATOR_BATCH_SIZE}
       CORRELATOR_POLL_INTERVAL_SECONDS: ${CORRELATOR_POLL_INTERVAL_SECONDS}
       CORRELATOR_LOG_LEVEL: ${CORRELATOR_LOG_LEVEL}
       CORRELATOR_COMPUTE_AVERAGE_PROCESSING_TIME: ${CORRELATOR_COMPUTE_AVERAGE_PROCESSING_TIME}
     depends_on:
-      db:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  seed-dev:
+    image: postgres:15
+    profiles: ["demo-data"]
+    environment:
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    command:
+      [
+        "sh",
+        "-ec",
+        "for file in /seeds/*.sql; do echo \"Applying $$file\"; PGPASSWORD=\"$$POSTGRES_PASSWORD\" psql -v ON_ERROR_STOP=1 -h \"$$DB_HOST\" -p \"$$DB_PORT\" -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\" -f \"$$file\"; done",
+      ]
+    volumes:
+      - ./postgres/seeds/dev:/seeds:ro
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
 
   frontend:
     build: ../cyber-dashboard-frontend
