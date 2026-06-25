@@ -18,11 +18,17 @@ services:
     image: ${CYBER_DASHBOARD_MIGRATE_IMAGE}
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${DB_HOST}:${DB_PORT}/${POSTGRES_DB}
+      CYBER_DASHBOARD_SECRET_KEY_FILE: /run/secrets/cyber_dashboard_secret_key
       CYBER_DASHBOARD_SECRET_KEY: ${CYBER_DASHBOARD_SECRET_KEY}
+      OGO_USERNAME: ${OGO_USERNAME:-}
+      OGO_API_KEY: ${OGO_API_KEY:-}
+      SERENICITY_API_KEY: ${SERENICITY_API_KEY:-}
     command: ["python", "/app/scripts/migrate.py"]
     depends_on:
       db:
         condition: service_healthy
+    secrets:
+      - cyber_dashboard_secret_key
 
   api:
     image: ${CYBER_DASHBOARD_API_IMAGE}
@@ -55,6 +61,7 @@ services:
       DB_NAME: ${POSTGRES_DB}
       DB_USER: ${POSTGRES_USER}
       DB_PASSWORD: ${POSTGRES_PASSWORD}
+      LIMIT_REQUEST_PER_DAY: ${LIMIT_REQUEST_PER_DAY}
       LOG_LEVEL: ${LOG_LEVEL}
       CYBER_DASHBOARD_SECRET_KEY_FILE: /run/secrets/cyber_dashboard_secret_key
       CYBER_DASHBOARD_SECRET_KEY: ${CYBER_DASHBOARD_SECRET_KEY}
