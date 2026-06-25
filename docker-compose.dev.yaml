@@ -9,6 +9,7 @@ services:
       - "5432:5432"
     volumes:
       - db_data:/var/lib/postgresql/data
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 10s
@@ -57,7 +58,7 @@ services:
   scheduler:
     build:
       context: ../cyber-dashboard-backend
-      dockerfile: apps/scheduler/Dockerfile
+      dockerfile: apps/cyber_dashboard_scheduler/Dockerfile
     environment:
       DB_HOST: ${DB_HOST}
       DB_PORT: ${DB_PORT}
@@ -79,7 +80,7 @@ services:
   common-ip-correlator:
     build:
       context: ../cyber-dashboard-backend
-      dockerfile: apps/common_ip/Dockerfile
+      dockerfile: apps/cyber_dashboard_common_ip/Dockerfile
     environment:
       DB_HOST: ${DB_HOST}
       DB_PORT: ${DB_PORT}
