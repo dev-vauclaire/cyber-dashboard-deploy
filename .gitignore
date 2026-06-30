@@ -1,5 +1,4 @@
 .env
-postgres/init.sql
 certs/*
 !certs/.gitkeep
 secrets/*
