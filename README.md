@@ -256,3 +256,14 @@ docker compose -f docker-compose.dev.yaml --profile demo-data up seed-dev
   Fernet.
 - Le fichier `postgres/init.sql` est documenté comme obligatoire parce qu'il
   est monté explicitement par les deux fichiers Compose.
+
+
+## Mettre à jour l'application 
+
+docker compose -f docker-compose.prod.yaml down  pour arrêter la stack
+
+git pull pour récupérer les dernieres modifications
+monitoring sur le fichier .env pour vérifier si des variables d'environnement ont été ajoutées ou modifiées toujours se baser sur .env.example
+surtout la partie versionning des images
+
+docker compose -f docker-compose.prod.yaml up

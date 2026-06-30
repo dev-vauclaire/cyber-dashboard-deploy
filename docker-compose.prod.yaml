@@ -23,7 +23,7 @@ services:
       OGO_USERNAME: ${OGO_USERNAME:-}
       OGO_API_KEY: ${OGO_API_KEY:-}
       SERENICITY_API_KEY: ${SERENICITY_API_KEY:-}
-    command: ["python", "/app/scripts/migrate.py"]
+    command: ["python", "/app/scripts/db/migrate.py"]
     depends_on:
       db:
         condition: service_healthy
