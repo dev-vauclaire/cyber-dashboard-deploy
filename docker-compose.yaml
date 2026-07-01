@@ -7,7 +7,6 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
     volumes:
       - db_data:/var/lib/postgresql/data
-      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 10s
@@ -15,7 +14,7 @@ services:
       retries: 10
 
   migrate:
-    image: ${CYBER_DASHBOARD_MIGRATE_IMAGE}
+    image: devauclaire/cyber-dashboard-migrate:2.0.1
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${DB_HOST}:${DB_PORT}/${POSTGRES_DB}
       CYBER_DASHBOARD_SECRET_KEY_FILE: /run/secrets/cyber_dashboard_secret_key
@@ -31,7 +30,7 @@ services:
       - cyber_dashboard_secret_key
 
   api:
-    image: ${CYBER_DASHBOARD_API_IMAGE}
+    image: devauclaire/cyber-dashboard-api:2.0.1
     environment:
       API_NAME: ${API_NAME}
       API_HOST: ${API_HOST}
@@ -54,7 +53,7 @@ services:
       - cyber_dashboard_secret_key
 
   scheduler:
-    image: ${CYBER_DASHBOARD_SCHEDULER_IMAGE}
+    image: devauclaire/cyber-dashboard-scheduler:2.0.0
     environment:
       DB_HOST: ${DB_HOST}
       DB_PORT: ${DB_PORT}
@@ -74,7 +73,7 @@ services:
       - cyber_dashboard_secret_key
 
   common-ip-correlator:
-    image: ${CYBER_DASHBOARD_COMMON_IP_IMAGE}
+    image: devauclaire/cyber-dashboard-common-ip:2.0.0
     environment:
       DB_HOST: ${DB_HOST}
       DB_PORT: ${DB_PORT}
@@ -90,7 +89,7 @@ services:
         condition: service_completed_successfully
 
   frontend:
-    image: ${CYBER_DASHBOARD_FRONTEND_IMAGE}
+    image: devauclaire/cyber-dashboard-frontend:2.0.3
     depends_on:
       - api
 

@@ -19,14 +19,6 @@ frontend et reverse proxy HTTPS.
 
 ## Présentation de l'application
 
-TODO :
-  - présenter l'architecture technique
-    - technologies utilisées
-    - conteneurs et rôles
-    - schéma de la stack
-  - rediriger vers le dépôt frontend et le dépôt backend
-  - rediriger vers les images Docker Hub
-
 Cyber Dashboard sert à détecter si vos différents systèmes 
 informatiques supervisés par OGO et serenicity
 subissent une attaque commune.
@@ -170,12 +162,14 @@ https://<ip-de-votre-serveur> ou https://<votre-domaine> si vous avez configuré
 
 ### 1. Sauvegarder la base de données
 
-Avant d'arrêter la stack, exportez la base PostgreSQL dans un script SQL :
+Avant d'arrêter la stack, je vous recommande d'exporter la base de donnée dans le cas où une migration échouerait :
 
 ```bash
 mkdir -p backups
-docker compose exec -T db sh -c 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' > backups/init.sql
+docker compose exec -T db sh -c 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' > backups/backup.sql
 ```
+
+> ⚠️ Mesure de prévention
 
 ### 2. Arrêter la stack
 
@@ -183,9 +177,7 @@ docker compose exec -T db sh -c 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' > b
 docker compose down
 ```
 
-> ⚠️ Ne lancez pas `docker compose down -v` pendant une mise à jour classique. L'option `-v` supprime les volumes Docker, donc la base de données.
-
-### 3. Récupérer la nouvelle version du dépôt
+### 3. Récupérer les nouvelles versions et fichiers du dépôt
 
 ```bash
 git pull
@@ -200,16 +192,29 @@ Comparez votre fichier `.env` avec `.env.example` :
 - si de nouvelles variables sont apparues dans `.env.example`, ajoutez-les dans `.env` ;
 - si des variables ont été supprimées de `.env.example`, retirez-les de `.env` ;
 
-> ⚠️ Ne remplacez pas directement votre fichier `.env` par `.env.example`, car `.env` contient vos valeurs.
-
 ### 5. Télécharger les images et redémarrer
 
 ```bash
-docker compose pull
 docker compose up -d
 ```
 
-Le redémarrage relance les conteneurs avec les images configurées dans `.env`. Le conteneur `migrate` applique les migrations nécessaires au démarrage.
+> ⚠️ Le redémarrage de la stack peut prendre quelques minutes, le temps que les migrations s'exécutent.
+
+### 6. Nettoyage des images et conteneurs obsolètes
+
+> ⚠️ Ne la lancer qu'après avoir vérifié que la nouvelle stack fonctionne correctement. [Vérifier la stack](#vérifier-la-stack)
+
+Cette commande supprime les conteneurs arrêtés
+
+```bash
+docker container prune
+```
+
+Cette commande supprime les images obsolètes
+
+```bash
+docker image prune -a
+```
 
 ## Vérifier la stack
 
@@ -220,7 +225,3 @@ docker compose ps -a
 ```
 
 Seul le service de migration devrait être en statut `Exited`.
-
-```bash
-docker compose logs <nom_du_service>
-```
