@@ -104,8 +104,6 @@ cat secrets/cyber_dashboard_secret_key
 
 > ⚠️ Il est recommandé de sauvegarder cette clé dans un coffre-fort sécurisé. La perte de cette clé rendra les secrets stockés en base de données irrécupérables.
 
-> ⚠️ Le fichier `secrets/cyber_dashboard_secret_key` est monté dans les conteneurs via Docker Compose. Le mode `644` permet aux processus non-root des conteneurs de lire le secret. Ne le remplacez pas par `600` sans vérifier l'utilisateur d'exécution des images.
-
 ### 2. Configurer les variables d'environnement
 
 Créez le fichier `.env` à partir de l'exemple fourni :
