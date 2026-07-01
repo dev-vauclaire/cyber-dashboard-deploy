@@ -8,25 +8,36 @@ frontend et reverse proxy HTTPS.
 
 - [Présentation de l'application](#présentation-de-lapplication)
 - [Architecture](#architecture)
-- [Déploiement de production](#déploiement-de-production)
-- [Démarrage en développement](#démarrage-en-développement)
-- [Points de fiabilité vérifiés](#points-de-fiabilité-vérifiés)
+- [Déploiement from scratch](#déploiement-from-scratch)
+  - [Prérequis](#prérequis)
+  - [1. Préparer la clé maître](#1-préparer-la-clé-maître)
+  - [2. Configurer les variables d'environnement](#2-configurer-les-variables-denvironnement)
+  - [3. Préparer HTTPS](#3-préparer-https)
+  - [4. Démarrer la stack](#4-démarrer-la-stack)
+- [Mettre à jour l'application](#mettre-à-jour-lapplication)
+- [Vérifier la stack](#vérifier-la-stack)
 
 ## Présentation de l'application
 
-Cyber Dashboard sert à détecter si plusieurs infrastructures supervisées
+TODO :
+  - présenter l'architecture technique
+    - technologies utilisées
+    - conteneurs et rôles
+    - schéma de la stack
+  - rediriger vers le dépôt frontend et le dépôt backend
+  - rediriger vers les images Docker Hub
+
+Cyber Dashboard sert à détecter si vos différents systèmes 
+informatiques supervisés par OGO et serenicity
 subissent une attaque commune.
 
 L'application fonctionne en trois étapes :
 
-1. **Collecte** : le scheduler récupère les journaux d'attaques depuis les
-   outils de cybersécurité configurés, puis les stocke en base PostgreSQL.
-2. **Corrélation** : le corrélateur recherche les adresses IP attaquantes
-   présentes dans plusieurs sources et crée une alerte lorsqu'une IP est
-   commune à plusieurs environnements.
-3. **Enrichissement** : le dashboard permet de consulter les alertes,
-   d'enrichir les données avec une CTI légère et d'envoyer un e-mail au
-   contact abuse associé à l'adresse IP.
+1. **Collecte** : Un scheduler (planifieur) récupère les journaux 
+  d'attaques de vos outils de cybersécurité `ogo` et `serenicity`.
+2. **Corrélation** : Un corrélateur lit les journaux d'attaques et lève une alerte si une même adresse 
+  IP est détectée par des outils différents.
+3. **Mise à disposition** : Un dashboard web permet une visualiation de vos données collectées et corrélées.
 
 ## Architecture
 
@@ -52,106 +63,85 @@ sources applicatives sont réparties dans deux dépôts :
 
 ![Schéma de la stack Docker](./assets/dockerStackSchemaV2.png)
 
-## Déploiement de production
+## Déploiement from scratch
 
-Toutes les commandes suivantes sont à exécuter depuis ce dossier :
+Commencez par cloner le dépôt et placez-vous dans le dossier `cyber-dashboard-deploy`.
 
 ```bash
+git clone https://github.com/dev-vauclaire/cyber-dashboard-deploy.git
 cd cyber-dashboard-deploy
 ```
+
+Toutes les commandes suivantes doivent être exécutées depuis le dossier `cyber-dashboard-deploy`.
 
 ### Prérequis
 
 - Un hôte Linux est recommandé.
-- Docker Engine et Docker Compose v2 doivent être installés.
+- Docker Engine et [Docker Compose](https://docs.docker.com/compose/install/linux/) doivent être installés.
 - Les ports `80` et `443` doivent être disponibles sur l'hôte.
-- Un certificat TLS valide doit être disponible pour le nom DNS exposé.
-- Une clé maître de chiffrement Fernet doit être créée ou récupérée.
-- Le fichier `postgres/init.sql` doit exister, même pour une installation vide.
+- Un fichier [`postgres/init.sql`](postgres/init.sql) vide doit être présent.
+- Prévoyez au minimum les ressources suivantes pour la stack complète :
+  - RAM : 6 Go
+  - CPU : 2 vCPU
+  - Disque : 32 Go
 
-Le dimensionnement matériel dépend du volume d'attaques collectées, de la
-rétention et du nombre de sources. Aucun benchmark de charge n'est fourni dans
-ce dépôt. Pour une petite installation ou une recette, prévoir au minimum
-`2 vCPU`, `4 Go` de RAM et `20 Go` de disque, puis augmenter selon la
-volumétrie PostgreSQL.
+### 1. Préparer la clé maître
 
-### 1. Préparer l'environnement
+Générez une clé maître et placez-la dans le dossier `secrets` à la racine du projet.
+Cette clé est utilisée pour chiffrer les secrets stockés en base de données.
+
+```bash
+python3 -c 'import base64, os; print(base64.urlsafe_b64encode(os.urandom(32)).decode())' > secrets/cyber_dashboard_secret_key
+chmod 644 secrets/cyber_dashboard_secret_key
+```
+
+Vérification de la création de la clé :
+
+```bash
+cat secrets/cyber_dashboard_secret_key
+```
+
+> ⚠️ Il est recommandé de sauvegarder cette clé dans un coffre-fort sécurisé. La perte de cette clé rendra les secrets stockés en base de données irrécupérables.
+
+> ⚠️ Le fichier `secrets/cyber_dashboard_secret_key` est monté dans les conteneurs via Docker Compose. Le mode `644` permet aux processus non-root des conteneurs de lire le secret. Ne le remplacez pas par `600` sans vérifier l'utilisateur d'exécution des images.
+
+### 2. Configurer les variables d'environnement
 
 Créez le fichier `.env` à partir de l'exemple fourni :
 
 ```bash
 cp .env.example .env
+```
+
+Modifiez ensuite uniquement les variables référencées ci-dessous dans `.env` avec les valeurs de production.
+
+| Variable | Description |
+| --- | --- |
+| `POSTGRES_USER` | Nom d'utilisateur de la base PostgreSQL |
+| `POSTGRES_PASSWORD` | Mot de passe de la base PostgreSQL |
+| `POSTGRES_DB` | Nom de la base PostgreSQL |
+
+Permissions recommandées pour le fichier `.env` :
+
+```bash
 chmod 600 .env
 ```
 
-Modifiez ensuite `.env` avec les valeurs de production.
-
-| Variable | Description | Statut |
-| --- | --- | --- |
-| `POSTGRES_USER` | Utilisateur PostgreSQL. | Obligatoire |
-| `POSTGRES_PASSWORD` | Mot de passe PostgreSQL. | Obligatoire, à changer |
-| `POSTGRES_DB` | Nom de la base PostgreSQL. | Obligatoire |
-| `DB_HOST` | Hôte PostgreSQL vu depuis les conteneurs, généralement `db`. | Obligatoire |
-| `DB_PORT` | Port PostgreSQL, généralement `5432`. | Obligatoire |
-| `API_NAME` | Nom logique de l'API. | Recommandé |
-| `API_HOST` | Adresse d'écoute logique de l'API, généralement `0.0.0.0`. | Recommandé |
-| `API_PORT` | Port interne de l'API, généralement `8000`. | Recommandé |
-| `API_LOG_LEVEL` | Niveau de logs de l'API. | Recommandé |
-| `CORRELATOR_BATCH_SIZE` | Taille des lots traités par le corrélateur. | Obligatoire |
-| `CORRELATOR_POLL_INTERVAL_SECONDS` | Pause entre deux cycles du corrélateur. | Obligatoire |
-| `CORRELATOR_LOG_LEVEL` | Niveau de logs du corrélateur. | Obligatoire |
-| `CORRELATOR_COMPUTE_AVERAGE_PROCESSING_TIME` | Active le calcul du temps moyen de traitement. | Obligatoire |
-| `LIMIT_REQUEST_PER_DAY` | Limite quotidienne utilisée par le scheduler. | Obligatoire |
-| `LOG_LEVEL` | Niveau de logs du scheduler. | Obligatoire |
-| `OGO_BASE_URL` | URL de base OGO pour les validations et collectes. | Obligatoire |
-| `SERENICITY_BASE_URL` | URL de base Serenicity. | Obligatoire |
-| `CYBER_DASHBOARD_SECRET_KEY_FILE` | Chemin interne de la clé montée dans les conteneurs ; le compose fourni le fixe à `/run/secrets/cyber_dashboard_secret_key`. | Garder la valeur de l'exemple |
-| `CYBER_DASHBOARD_SECRET_KEY` | Clé maître fournie directement par variable d'environnement. | Optionnel, laisser vide si le fichier secret est monté |
-| `CYBER_DASHBOARD_API_IMAGE` | Image de production de l'API. | Obligatoire |
-| `CYBER_DASHBOARD_SCHEDULER_IMAGE` | Image de production du scheduler. | Obligatoire |
-| `CYBER_DASHBOARD_COMMON_IP_IMAGE` | Image de production du corrélateur. | Obligatoire |
-| `CYBER_DASHBOARD_FRONTEND_IMAGE` | Image de production du frontend. | Obligatoire |
-| `CYBER_DASHBOARD_MIGRATE_IMAGE` | Image de production du conteneur de migration. | Obligatoire |
-
-Si vous migrez d'anciens identifiants collecteurs, vous pouvez aussi définir
-`OGO_USERNAME`, `OGO_API_KEY` et `SERENICITY_API_KEY`. Ces variables sont
-optionnelles et ne sont utilisées que par le conteneur `migrate`.
-
-### 2. Préparer la clé maître
-
-La clé maître doit être disponible sur l'hôte dans :
-
-```text
-secrets/cyber_dashboard_secret_key
-```
-
-Elle est montée dans les conteneurs sous :
-
-```text
-/run/secrets/cyber_dashboard_secret_key
-```
-
-Le contenu attendu est une clé Fernet, c'est-à-dire une valeur base64 URL-safe
-encodant 32 octets. Pour générer une nouvelle clé :
-
-```bash
-mkdir -p secrets
-python3 -c 'import base64, os; print(base64.urlsafe_b64encode(os.urandom(32)).decode())' \
-  > secrets/cyber_dashboard_secret_key
-chmod 600 secrets/cyber_dashboard_secret_key
-```
-
-Si vous migrez une base qui contient déjà des secrets chiffrés, réutilisez la
-clé maître historique. Une nouvelle clé empêcherait le déchiffrement des
-secrets existants.
-
 ### 3. Préparer HTTPS
 
+Procurez-vous un [certificat TLS](https://aws.amazon.com/fr/what-is/ssl-certificate/) validé par votre autorité de certification
+pour votre domaine et placez les fichiers dans le dossier `certs` à la racine du projet.
 Nginx attend les fichiers suivants :
 
 ```text
 certs/fullchain.pem
 certs/privkey.pem
+```
+
+Si vous souhaitez utiliser un certificat auto-signé, vous pouvez utiliser la commande suivante :
+
+```bash
+openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout certs/privkey.pem -out certs/fullchain.pem -subj "/CN=localhost"
 ```
 
 Permissions recommandées :
@@ -161,109 +151,76 @@ chmod 644 certs/fullchain.pem
 chmod 600 certs/privkey.pem
 ```
 
-La configuration Nginx active HSTS. N'utilisez cette configuration que lorsque
-le certificat et le nom DNS sont stables pour le domaine servi.
-
-### 4. Préparer l'initialisation PostgreSQL
-
-Le compose monte `postgres/init.sql` dans l'image PostgreSQL. Ce fichier doit
-donc exister.
-
-Pour une installation neuve :
+### 4. Démarrer la stack
 
 ```bash
-mkdir -p postgres
-touch postgres/init.sql
+docker compose up -d
 ```
 
-Pour migrer une ancienne base V1, placez le dump SQL dans ce fichier :
+Depuis une autre machine, vérifiez si le site est accessible
+via HTTPS sur le port 443.
+
+```text
+https://<ip-de-votre-serveur> ou https://<votre-domaine> si vous avez configuré un nom de domaine.
+```
+
+> ⚠️ Pour vérifier que les services tournent correctement : [Vérifier la stack](#vérifier-la-stack).
+
+## Mettre à jour l'application
+
+### 1. Sauvegarder la base de données
+
+Avant d'arrêter la stack, exportez la base PostgreSQL dans un script SQL :
 
 ```bash
-cp /chemin/vers/dump-v1.sql postgres/init.sql
-chmod 644 postgres/init.sql
+mkdir -p backups
+docker compose exec -T db sh -c 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' > backups/init.sql
 ```
 
-Ce script est exécuté uniquement lors de la première initialisation du volume
-PostgreSQL `db_data`. Si le volume existe déjà, PostgreSQL n'exécutera pas de
-nouveau `postgres/init.sql`.
-
-Le conteneur `migrate` inspecte ensuite la base :
-
-1. base vide : exécution de `alembic upgrade head` ;
-2. base V1 reconnue : marquage de la révision de base, puis migration ;
-3. base déjà versionnée Alembic : migration jusqu'à `head` ;
-4. schéma inconnu : arrêt de sécurité.
-
-### 5. Valider la configuration
-
-Vérifiez la configuration Compose avant de démarrer :
+### 2. Arrêter la stack
 
 ```bash
-docker compose -f docker-compose.prod.yaml config
+docker compose down
 ```
 
-Cette commande doit s'exécuter sans erreur et afficher les services résolus.
+> ⚠️ Ne lancez pas `docker compose down -v` pendant une mise à jour classique. L'option `-v` supprime les volumes Docker, donc la base de données.
 
-### 6. Démarrer la stack
-
-Le fichier `docker-compose.prod.yaml` consomme des images déjà publiées dans un
-registry. Il ne build rien localement.
+### 3. Récupérer la nouvelle version du dépôt
 
 ```bash
-docker compose -f docker-compose.prod.yaml pull
-docker compose -f docker-compose.prod.yaml up -d
+git pull
 ```
 
-### 7. Vérifier le démarrage
+Cette commande met à jour les fichiers du dépôt, notamment `docker-compose.yaml` et `.env.example`.
+
+### 4. Mettre à jour le fichier `.env`
+
+Comparez votre fichier `.env` avec `.env.example` :
+
+- si de nouvelles variables sont apparues dans `.env.example`, ajoutez-les dans `.env` ;
+- si des variables ont été supprimées de `.env.example`, retirez-les de `.env` ;
+
+> ⚠️ Ne remplacez pas directement votre fichier `.env` par `.env.example`, car `.env` contient vos valeurs.
+
+### 5. Télécharger les images et redémarrer
 
 ```bash
-docker compose -f docker-compose.prod.yaml ps -a
-docker compose -f docker-compose.prod.yaml logs -f migrate
-docker compose -f docker-compose.prod.yaml logs -f api scheduler common-ip-correlator reverse-proxy
+docker compose pull
+docker compose up -d
 ```
 
-Vérifiez ensuite l'endpoint de santé :
+Le redémarrage relance les conteneurs avec les images configurées dans `.env`. Le conteneur `migrate` applique les migrations nécessaires au démarrage.
+
+## Vérifier la stack
+
+Vérifiez que les services sont bien en statut `Up` avec la commande suivante :
 
 ```bash
-curl https://votre-domaine.example/health
+docker compose ps -a
 ```
 
-Pour un certificat auto-signé en recette, ajoutez `-k` à la commande `curl`.
-
-## Démarrage en développement
-
-Le fichier `docker-compose.dev.yaml` build les images depuis les dossiers
-locaux `../cyber-dashboard-backend` et `../cyber-dashboard-frontend`.
+Seul le service de migration devrait être en statut `Exited`.
 
 ```bash
-docker compose -f docker-compose.dev.yaml up --build -d
+docker compose logs <nom_du_service>
 ```
-
-Pour charger les données de démonstration :
-
-```bash
-docker compose -f docker-compose.dev.yaml --profile demo-data up seed-dev
-```
-
-## Points de fiabilité vérifiés
-
-- La syntaxe de `docker-compose.prod.yaml` et `docker-compose.dev.yaml` est
-  valide avec `docker compose ... config`.
-- Le scheduler reçoit bien les variables obligatoires attendues par le code,
-  notamment `LIMIT_REQUEST_PER_DAY`.
-- Le conteneur `migrate` reçoit la même clé maître que l'API et le scheduler.
-- La commande de génération de clé documentée produit une clé compatible avec
-  Fernet.
-- Le fichier `postgres/init.sql` est documenté comme obligatoire parce qu'il
-  est monté explicitement par les deux fichiers Compose.
-
-
-## Mettre à jour l'application 
-
-docker compose -f docker-compose.prod.yaml down  pour arrêter la stack
-
-git pull pour récupérer les dernieres modifications
-monitoring sur le fichier .env pour vérifier si des variables d'environnement ont été ajoutées ou modifiées toujours se baser sur .env.example
-surtout la partie versionning des images
-
-docker compose -f docker-compose.prod.yaml up
