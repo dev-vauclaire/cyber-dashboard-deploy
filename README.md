@@ -1,13 +1,15 @@
 # Cyber Dashboard Deploy
 
-Ce dossier contient la stack Docker Compose permettant de déployer Cyber
-Dashboard : base PostgreSQL, migrations, API, scheduler, corrélateur,
-frontend et reverse proxy HTTPS.
+Ce projet contient les fichiers et la documentation nécessaires pour déployer l'application Cyber Dashboard.
+Ce README est séparé en 3 parties selon ce que vous souhaitez faire : 
+  - Avoir un aperçu de l'application et de son architecture
+  - Déployer l'application from scratch
+  - Mettre à jour l'application
 
 ## Sommaire
 
 - [Présentation de l'application](#présentation-de-lapplication)
-- [Architecture](#architecture)
+  - [Architecture](#architecture)
 - [Déploiement from scratch](#déploiement-from-scratch)
   - [Prérequis](#prérequis)
   - [1. Préparer la clé maître](#1-préparer-la-clé-maître)
@@ -15,6 +17,12 @@ frontend et reverse proxy HTTPS.
   - [3. Préparer HTTPS](#3-préparer-https)
   - [4. Démarrer la stack](#4-démarrer-la-stack)
 - [Mettre à jour l'application](#mettre-à-jour-lapplication)
+  - [1. Sauvegarder la base de données](#1-sauvegarder-la-base-de-données)
+  - [2. Arrêter la stack](#2-arrêter-la-stack)
+  - [3. Récupérer les nouvelles versions et fichiers du dépôt](#3-récupérer-les-nouvelles-versions-et-fichiers-du-dépôt)
+  - [4. Mettre à jour le fichier `.env`](#4-mettre-à-jour-le-fichier-env)
+  - [5. Télécharger les images et redémarrer](#5-télécharger-les-images-et-redémarrer)
+  - [6. Nettoyage des images et conteneurs obsolètes](#6-nettoyage-des-images-et-conteneurs-obsolètes)
 - [Vérifier la stack](#vérifier-la-stack)
 
 ## Présentation de l'application
@@ -23,30 +31,31 @@ Cyber Dashboard sert à détecter si vos différents systèmes
 informatiques supervisés par OGO et serenicity
 subissent une attaque commune.
 
-L'application fonctionne en trois étapes :
+L'application s'organise en 3 axes principaux :
 
 1. **Collecte** : Un scheduler (planifieur) récupère les journaux 
   d'attaques de vos outils de cybersécurité `ogo` et `serenicity`.
 2. **Corrélation** : Un corrélateur lit les journaux d'attaques et lève une alerte si une même adresse 
   IP est détectée par des outils différents.
-3. **Mise à disposition** : Un dashboard web permet une visualiation de vos données collectées et corrélées.
+3. **Mise à disposition** : Un dashboard web permet une visualisation de vos données collectées et corrélées.
 
-## Architecture
+![Schéma de la stack Docker](./assets/overview.png)
 
-La stack est composée de plusieurs conteneurs, chacun avec un rôle dédié.
+### Architecture
+
+La stack est composée de plusieurs conteneurs le tout orchestré par Docker Compose, chacun ayant un rôle dédié.
 
 | Service Compose | Rôle |
 | --- | --- |
 | `db` | Stocke les attaques, les alertes, les sources et la configuration applicative. |
-| `migrate` | Exécute les migrations Alembic au démarrage, puis s'arrête. |
+| `migrate` | Exécute les migrations Alembic au démarrage si nécessaire. |
 | `api` | Expose l'API utilisée par le frontend. |
-| `scheduler` | Collecte les attaques et met à jour les données applicatives. |
-| `common-ip-correlator` | Corrèle les adresses IP communes entre plusieurs sources. |
+| `scheduler` | Réalise des inventaires d'outils de cyber et collecte leurs journaux d'attaques. |
+| `common-ip-correlator` | Encapsule une hashmap pour corréler les adresses IP communes entre plusieurs sources. |
 | `frontend` | Sert l'interface utilisateur. |
 | `reverse-proxy` | Termine le TLS et route le trafic vers le frontend ou l'API. |
 
-Les images de production sont configurées par variables d'environnement. Les
-sources applicatives sont réparties dans deux dépôts :
+Le code source est disponible dans deux dépôts distincts :
 
 | Composant | Dépôt |
 | --- | --- |
