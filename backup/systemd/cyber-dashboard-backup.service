@@ -1,0 +1,15 @@
+[Unit]
+Description=Sauvegarde PostgreSQL de Cyber Dashboard sur NFS
+Requires=docker.service
+Wants=network-online.target
+After=docker.service network-online.target
+RequiresMountsFor=/mnt/nfs_Qnap
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/cyber-dashboard-deploy
+Environment=PROJECT_DIR=/opt/cyber-dashboard-deploy
+Environment=BACKUP_MOUNT=/mnt/nfs_Qnap
+ExecStart=/usr/local/sbin/cyber-dashboard-backup --if-due
+UMask=0077
+TimeoutStartSec=2h

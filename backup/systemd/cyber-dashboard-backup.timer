@@ -1,0 +1,11 @@
+[Unit]
+Description=Vérification horaire de la sauvegarde Cyber Dashboard tous les quatre jours
+
+[Timer]
+OnCalendar=hourly
+Persistent=true
+AccuracySec=1s
+Unit=cyber-dashboard-backup.service
+
+[Install]
+WantedBy=timers.target
